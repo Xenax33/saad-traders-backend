@@ -25,23 +25,6 @@ async function main() {
   });
 
   console.log('✅ Admin user created:', admin.email);
-
-  // Seed some sample HS codes
-  const hsCodes = [
-    { hsCode: '1234.56.78', description: 'Sample HS Code 1' },
-    { hsCode: '8765.43.21', description: 'Sample HS Code 2' },
-    { hsCode: '5555.55.55', description: 'Sample HS Code 3' },
-  ];
-
-  for (const code of hsCodes) {
-    await prisma.hsCode.upsert({
-      where: { hsCode: code.hsCode },
-      update: {},
-      create: code,
-    });
-  }
-
-  console.log('✅ Sample HS codes created');
   console.log('🎉 Database seeded successfully!');
 }
 
