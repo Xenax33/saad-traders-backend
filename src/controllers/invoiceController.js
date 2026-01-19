@@ -129,7 +129,7 @@ export const postInvoice = async (req, res, next) => {
         sroScheduleNo: item.sroScheduleNo || '',
         fedPayable: item.fedPayable,
         discount: item.discount,
-        saleType: scenario.scenarioDescription,
+        saleType: scenario.salesType,
         sroItemSerialNo: item.sroItemSerialNo || '',
       })),
     };
