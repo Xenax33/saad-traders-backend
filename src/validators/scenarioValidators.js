@@ -26,6 +26,10 @@ export const updateGlobalScenarioValidation = [
     .trim()
     .isLength({ min: 3, max: 500 })
     .withMessage('Scenario description must be between 3 and 500 characters'),
+  body('salesType')
+    .optional()
+    .isLength({ min: 1, max: 255 })
+    .withMessage('Sales type must be between 1 and 255 characters'),
 ];
 
 export const assignScenarioValidation = [

@@ -94,7 +94,7 @@ export const getGlobalScenarioById = catchAsync(async (req, res, next) => {
 
 export const updateGlobalScenario = catchAsync(async (req, res, next) => {
   const { id } = req.params;
-  const { scenarioCode, scenarioDescription } = req.body;
+  const { scenarioCode, scenarioDescription, salesType } = req.body;
 
   const existingScenario = await prisma.globalScenario.findUnique({
     where: { id },
@@ -115,12 +115,15 @@ export const updateGlobalScenario = catchAsync(async (req, res, next) => {
     }
   }
 
+  const data = {};
+  if (scenarioCode) data.scenarioCode = scenarioCode;
+  if (scenarioDescription) data.scenarioDescription = scenarioDescription;
+  // Don't trim salesType - preserve exact case sensitivity
+  if (salesType !== undefined) data.salesType = salesType;
+
   const scenario = await prisma.globalScenario.update({
     where: { id },
-    data: {
-      ...(scenarioCode && { scenarioCode }),
-      ...(scenarioDescription && { scenarioDescription }),
-    },
+    data,
   });
 
   res.status(200).json({

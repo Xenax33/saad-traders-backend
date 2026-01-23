@@ -55,11 +55,17 @@ export const getGlobalScenarios = async (req, res, next) => {
 export const updateGlobalScenario = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { scenarioDescription } = req.body;
+    const { scenarioCode, scenarioDescription, salesType } = req.body;
+
+    const data = {};
+    if (scenarioCode !== undefined) data.scenarioCode = scenarioCode.trim();
+    if (scenarioDescription !== undefined) data.scenarioDescription = scenarioDescription.trim();
+    // Don't trim salesType - preserve exact case sensitivity
+    if (salesType !== undefined) data.salesType = salesType;
 
     const scenario = await prisma.globalScenario.update({
       where: { id },
-      data: { scenarioDescription },
+      data,
     });
 
     res.status(200).json({ status: 'success', data: { scenario } });
