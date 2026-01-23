@@ -340,6 +340,17 @@ export const getUserInvoices = async (req, res, next) => {
           },
           buyer: true,
           scenario: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              businessName: true,
+              ntncnic: true,
+              province: true,
+              address: true,
+            },
+          },
         },
         skip,
         take: parseInt(limit),

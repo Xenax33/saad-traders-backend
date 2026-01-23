@@ -2,7 +2,7 @@
 
 **Base URL**: `http://localhost:5000/api/v1`
 
-**Last Updated**: January 18, 2026
+**Last Updated**: January 23, 2026
 
 ---
 
@@ -38,7 +38,7 @@
   - [Update Buyer](#4-update-buyer)
   - [Delete Buyer](#5-delete-buyer)
 - [HS Code Management APIs](#hs-code-management-apis)
-  - [Create HS Code](#1-create-hs-code)
+  - [Create HS Code (Single/Bulk)](#1-create-hs-code)
   - [Get All HS Codes](#2-get-all-hs-codes)
   - [Get HS Code by ID](#3-get-hs-code-by-id)
   - [Update HS Code](#4-update-hs-code)
@@ -1916,7 +1916,7 @@ Authorization: Bearer <access-token>
 
 ### 1. Create HS Code
 
-Create a new HS Code for the authenticated user.
+Create a new HS Code for the authenticated user. Supports both single and bulk creation.
 
 **Endpoint**: `POST /hs-codes`
 
@@ -1925,6 +1925,8 @@ Create a new HS Code for the authenticated user.
 Authorization: Bearer <access-token>
 Content-Type: application/json
 ```
+
+#### Single HS Code Creation
 
 **Request Body**:
 ```json
@@ -1966,9 +1968,93 @@ curl -X POST http://localhost:5000/api/v1/hs-codes \
 }
 ```
 
+#### Bulk HS Code Creation
+
+**Request Body**:
+```json
+{
+  "hsCodes": [
+    {
+      "hsCode": "0101.2100",
+      "description": "Live horses - Pure-bred breeding animals"
+    },
+    {
+      "hsCode": "0201.1000",
+      "description": "Carcasses and half-carcasses of bovine animals, fresh or chilled"
+    },
+    {
+      "hsCode": "0301.1100",
+      "description": "Ornamental fish - Freshwater"
+    }
+  ]
+}
+```
+
+**Field Descriptions**:
+- `hsCodes`: Array of HS Code objects (required, minimum 1 item)
+  - `hsCode`: HS Code in format XXXX.XXXX (required for each item)
+  - `description`: Description of the HS Code (optional for each item, max 500 characters)
+
+**cURL Request**:
+```bash
+curl -X POST http://localhost:5000/api/v1/hs-codes \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hsCodes": [
+      {
+        "hsCode": "0101.2100",
+        "description": "Live horses - Pure-bred breeding animals"
+      },
+      {
+        "hsCode": "0201.1000",
+        "description": "Carcasses and half-carcasses of bovine animals, fresh or chilled"
+      }
+    ]
+  }'
+```
+
+**Success Response (201 Created)**:
+```json
+{
+  "status": "success",
+  "data": {
+    "summary": {
+      "total": 3,
+      "created": 2,
+      "failed": 1
+    },
+    "created": [
+      {
+        "id": "bb1e8400-e29b-41d4-a716-446655440002",
+        "userId": "550e8400-e29b-41d4-a716-446655440000",
+        "hsCode": "0101.2100",
+        "description": "Live horses - Pure-bred breeding animals",
+        "createdAt": "2026-01-23T10:00:00.000Z",
+        "updatedAt": "2026-01-23T10:00:00.000Z"
+      },
+      {
+        "id": "cc2e8400-e29b-41d4-a716-446655440003",
+        "userId": "550e8400-e29b-41d4-a716-446655440000",
+        "hsCode": "0201.1000",
+        "description": "Carcasses and half-carcasses of bovine animals, fresh or chilled",
+        "createdAt": "2026-01-23T10:00:00.000Z",
+        "updatedAt": "2026-01-23T10:00:00.000Z"
+      }
+    ],
+    "failed": [
+      {
+        "hsCode": "0301.1100",
+        "reason": "HS Code already exists"
+      }
+    ]
+  }
+}
+```
+
 **Error Responses**:
 
-**400 Bad Request** - Duplicate HS Code:
+**400 Bad Request** - Duplicate HS Code (Single Creation):
 ```json
 {
   "status": "fail",
@@ -1976,6 +2062,17 @@ curl -X POST http://localhost:5000/api/v1/hs-codes \
     "statusCode": 400
   },
   "message": "HS Code already exists"
+}
+```
+
+**400 Bad Request** - Validation Error:
+```json
+{
+  "status": "fail",
+  "error": {
+    "statusCode": 400
+  },
+  "message": "[{\"field\":\"hsCode\",\"message\":\"HS Code must be in format XXXX.XXXX (e.g., 0000.0000)\"}]"
 }
 ```
 

@@ -4,11 +4,7 @@ export const createBuyerValidation = [
   body('ntncnic')
     .trim()
     .notEmpty()
-    .withMessage('NTN/CNIC is required')
-    .isLength({ min: 13, max: 13 })
-    .withMessage('NTN/CNIC must be exactly 13 digits')
-    .isNumeric()
-    .withMessage('NTN/CNIC must contain only numbers'),
+    .withMessage('NTN/CNIC is required'),
 
   body('businessName')
     .trim()
@@ -40,11 +36,7 @@ export const createBuyerValidation = [
 export const updateBuyerValidation = [
   body('ntncnic')
     .optional()
-    .trim()
-    .isLength({ min: 13, max: 13 })
-    .withMessage('NTN/CNIC must be exactly 13 digits')
-    .isNumeric()
-    .withMessage('NTN/CNIC must contain only numbers'),
+    .trim(),
 
   body('businessName')
     .optional()

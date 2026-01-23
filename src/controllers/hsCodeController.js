@@ -4,14 +4,71 @@ import { AppError } from '../utils/errors.js';
 const prisma = new PrismaClient();
 
 /**
- * Create a new HS Code
+ * Create a new HS Code (single or bulk)
  * @route POST /api/v1/hs-codes
  */
 export const createHsCode = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const { hsCode, description } = req.body;
+    const { hsCode, description, hsCodes } = req.body;
 
+    // Bulk creation
+    if (hsCodes && Array.isArray(hsCodes)) {
+      const results = {
+        created: [],
+        failed: [],
+      };
+
+      for (const item of hsCodes) {
+        try {
+          // Check if HS code already exists for this user
+          const existingHsCode = await prisma.hsCode.findFirst({
+            where: {
+              userId,
+              hsCode: item.hsCode,
+            },
+          });
+
+          if (existingHsCode) {
+            results.failed.push({
+              hsCode: item.hsCode,
+              reason: 'HS Code already exists',
+            });
+            continue;
+          }
+
+          const newHsCode = await prisma.hsCode.create({
+            data: {
+              userId,
+              hsCode: item.hsCode,
+              description: item.description || null,
+            },
+          });
+
+          results.created.push(newHsCode);
+        } catch (error) {
+          results.failed.push({
+            hsCode: item.hsCode,
+            reason: error.message,
+          });
+        }
+      }
+
+      return res.status(201).json({
+        status: 'success',
+        data: {
+          summary: {
+            total: hsCodes.length,
+            created: results.created.length,
+            failed: results.failed.length,
+          },
+          created: results.created,
+          failed: results.failed,
+        },
+      });
+    }
+
+    // Single creation
     // Check if HS code already exists for this user
     const existingHsCode = await prisma.hsCode.findFirst({
       where: {

@@ -30,9 +30,7 @@ export const createUserValidation = [
   body('ntncnic')
     .trim()
     .notEmpty()
-    .withMessage('NTN/CNIC is required')
-    .matches(/^[0-9]{13}$/)
-    .withMessage('NTN/CNIC must be 13 digits'),
+    .withMessage('NTN/CNIC is required'),
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
@@ -68,9 +66,7 @@ export const updateUserValidation = [
     .withMessage('Address must be between 5 and 500 characters'),
   body('ntncnic')
     .optional()
-    .trim()
-    .matches(/^[0-9]{13}$/)
-    .withMessage('NTN/CNIC must be 13 digits'),
+    .trim(),
 ];
 
 export const updatePasswordValidation = [
