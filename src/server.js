@@ -13,10 +13,21 @@ import invoiceRoutes from './routes/invoiceRoutes.js';
 
 const app = express();
 
-// CORS configuration - Allow all origins (temporary for testing)
+// CORS configuration - lock to production domain in production
+const allowedProdOrigins = ['https://saadtrader.pk', 'https://www.saadtrader.pk'];
 const corsOptions = {
-  origin: '*',
-  credentials: false, // Must be false when origin is '*'
+  origin: (origin, callback) => {
+    if (config.nodeEnv !== 'production') {
+      return callback(null, true);
+    }
+
+    if (origin && allowedProdOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: false,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
