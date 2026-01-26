@@ -20,23 +20,39 @@ if (config.nodeEnv === 'production') {
 }
 
 // CORS configuration - lock to production domain in production
-const allowedProdOrigins = ['https://saadtrader.pk', 'https://www.saadtrader.pk'];
 const corsOptions = {
   origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // In development, allow all origins
     if (config.nodeEnv !== 'production') {
       return callback(null, true);
     }
 
-    if (origin && allowedProdOrigins.includes(origin)) {
+    // In production, only allow specific origins from config
+    if (config.allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
+    // Reject unauthorized origins in production
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: false,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Accept',
+    'X-Requested-With',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers',
+  ],
+  exposedHeaders: [],
+  maxAge: 86400,
 };
 
 // Middleware
