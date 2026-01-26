@@ -7,6 +7,9 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   databaseUrl: process.env.DATABASE_URL,
   clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+  allowedOrigins: process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
+    : ['https://saadtrader.pk', 'https://www.saadtrader.pk'],
   jwt: {
     secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key',
