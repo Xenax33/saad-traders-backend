@@ -125,6 +125,130 @@ export const postInvoiceValidation = [
     .trim(),
 ];
 
+export const postProductionInvoiceValidation = [
+  body('invoiceType')
+    .trim()
+    .notEmpty()
+    .withMessage('Invoice type is required')
+    .isString()
+    .withMessage('Invoice type must be a string'),
+
+  body('invoiceDate')
+    .notEmpty()
+    .withMessage('Invoice date is required')
+    .isISO8601()
+    .withMessage('Invoice date must be in yyyy-MM-dd format'),
+
+  body('buyerId')
+    .trim()
+    .notEmpty()
+    .withMessage('Buyer ID is required')
+    .isUUID()
+    .withMessage('Buyer ID must be a valid UUID'),
+
+  body('invoiceRefNo')
+    .optional()
+    .trim(),
+
+  body('items')
+    .isArray({ min: 1 })
+    .withMessage('At least one invoice item is required'),
+
+  body('items.*.hsCodeId')
+    .trim()
+    .notEmpty()
+    .withMessage('HS Code ID is required for each item')
+    .isUUID()
+    .withMessage('HS Code ID must be a valid UUID'),
+
+  body('items.*.productDescription')
+    .trim()
+    .notEmpty()
+    .withMessage('Product description is required for each item'),
+
+  body('items.*.rate')
+    .trim()
+    .notEmpty()
+    .withMessage('Rate is required for each item'),
+
+  body('items.*.uoM')
+    .trim()
+    .notEmpty()
+    .withMessage('Unit of measurement is required for each item'),
+
+  body('items.*.quantity')
+    .notEmpty()
+    .withMessage('Quantity is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Quantity must be a positive number'),
+
+  body('items.*.totalValues')
+    .notEmpty()
+    .withMessage('Total values is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Total values must be a positive number'),
+
+  body('items.*.valueSalesExcludingST')
+    .notEmpty()
+    .withMessage('Value excluding sales tax is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Value excluding sales tax must be a positive number'),
+
+  body('items.*.fixedNotifiedValueOrRetailPrice')
+    .notEmpty()
+    .withMessage('Fixed notified value or retail price is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Fixed notified value or retail price must be a positive number'),
+
+  body('items.*.salesTaxApplicable')
+    .notEmpty()
+    .withMessage('Sales tax applicable is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Sales tax applicable must be a positive number'),
+
+  body('items.*.salesTaxWithheldAtSource')
+    .notEmpty()
+    .withMessage('Sales tax withheld at source is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Sales tax withheld at source must be a positive number'),
+
+  body('items.*.extraTax')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Extra tax must be a number'),
+
+  body('items.*.furtherTax')
+    .notEmpty()
+    .withMessage('Further tax is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Further tax must be a positive number'),
+
+  body('items.*.sroScheduleNo')
+    .optional()
+    .trim(),
+
+  body('items.*.fedPayable')
+    .notEmpty()
+    .withMessage('FED payable is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('FED payable must be a positive number'),
+
+  body('items.*.discount')
+    .notEmpty()
+    .withMessage('Discount is required for each item')
+    .isFloat({ min: 0 })
+    .withMessage('Discount must be a positive number'),
+
+  body('items.*.saleType')
+    .trim()
+    .notEmpty()
+    .withMessage('Sale type is required for each item'),
+
+  body('items.*.sroItemSerialNo')
+    .optional()
+    .trim(),
+];
+
 export const validateInvoiceValidation = [
   body('invoiceNumber')
     .trim()

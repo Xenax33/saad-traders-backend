@@ -44,7 +44,8 @@
   - [Update HS Code](#4-update-hs-code)
   - [Delete HS Code](#5-delete-hs-code)
 - [Invoice Management APIs](#invoice-management-apis)
-  - [Post Invoice to FBR](#1-post-invoice-to-fbr)
+  - [Post Invoice to FBR (Test Environment)](#1-post-invoice-to-fbr)
+  - [Post Invoice to FBR (Production Environment)](#1a-post-invoice-to-fbr-production-environment)
   - [Validate Invoice with FBR](#2-validate-invoice-with-fbr)
   - [Get User Invoices](#3-get-user-invoices)
   - [Get Invoice by ID](#4-get-invoice-by-id)
@@ -2270,7 +2271,7 @@ Authorization: Bearer <access-token>
 
 ---
 
-### 1. Post Invoice to FBR
+### 1. Post Invoice to FBR (Test Environment)
 
 Submit an invoice to FBR's system (Sandbox or Production environment).
 
@@ -2576,6 +2577,290 @@ curl -X POST http://localhost:5000/api/v1/invoices \
     "statusCode": 500
   },
   "message": "FBR API Error: Failed to post invoice"
+}
+```
+
+---
+
+### 1a. Post Invoice to FBR (Production Environment)
+
+Submit an invoice to FBR's production system. This endpoint is for live transactions.
+
+**Important Notes**: 
+- This endpoint uses the production FBR API: `https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata`
+- Requires a valid production token (`postInvoiceToken`) configured by admin
+- Does NOT require `scenarioId` - specify `saleType` directly in each item
+- `isTestEnvironment` is automatically set to `false`
+
+**Prerequisites**: 
+- Create buyers using `/buyers` endpoint
+- Create HS codes using `/hs-codes` endpoint
+- Ensure admin has configured your production FBR token
+
+**Endpoint**: `POST /invoices/production`
+
+**Headers**:
+```
+Authorization: Bearer <access-token>
+Content-Type: application/json
+```
+
+**Request Body**:
+```json
+{
+  "invoiceType": "Sale Invoice",
+  "invoiceDate": "2026-01-17",
+  "buyerId": "990e8400-e29b-41d4-a716-446655440001",
+  "invoiceRefNo": "INV-2026-001",
+  "items": [
+    {
+      "hsCodeId": "bb0e8400-e29b-41d4-a716-446655440001",
+      "productDescription": "Sample Product",
+      "rate": "18%",
+      "uoM": "Numbers, pieces, units",
+      "quantity": 1,
+      "totalValues": 0,
+      "valueSalesExcludingST": 1000,
+      "fixedNotifiedValueOrRetailPrice": 0,
+      "salesTaxApplicable": 180,
+      "salesTaxWithheldAtSource": 0,
+      "extraTax": 0,
+      "furtherTax": 120,
+      "sroScheduleNo": "SRO123",
+      "fedPayable": 0,
+      "discount": 0,
+      "saleType": "Goods at standard rate (default)",
+      "sroItemSerialNo": ""
+    }
+  ]
+}
+```
+
+**Field Descriptions**:
+- `invoiceType`: Type of invoice (e.g., "Sale Invoice") - required
+- `invoiceDate`: Date in yyyy-MM-dd format - required
+- `buyerId`: UUID of the buyer (must be created first) - required
+- `invoiceRefNo`: Optional reference number
+- `items`: Array of invoice items (at least 1 required)
+
+**Seller Information** (automatically fetched from your user profile):
+- Seller's NTN/CNIC
+- Seller's business name
+- Seller's province
+- Seller's address
+
+**Buyer Information** (fetched from buyer table using `buyerId`)
+**HS Code** (fetched from hs_codes table using `hsCodeId` for each item)
+
+**Item Fields**:
+- `hsCodeId`: UUID of the HS Code (must be created first) - required
+- `productDescription`: Description of the product - required
+- `rate`: Tax rate (e.g., "18%") - required
+- `uoM`: Unit of measurement (e.g., "Numbers, pieces, units") - required
+- `quantity`: Quantity of items - required
+- `totalValues`: Total value including tax - required
+- `valueSalesExcludingST`: Value excluding sales tax - required
+- `fixedNotifiedValueOrRetailPrice`: Fixed/retail price - required
+- `salesTaxApplicable`: Applicable sales tax amount - required
+- `salesTaxWithheldAtSource`: Tax withheld at source - required
+- `extraTax`: Additional tax (use 0 for none) - required
+- `furtherTax`: Further tax amount - required
+- `sroScheduleNo`: SRO schedule number (optional)
+- `fedPayable`: Federal excise duty payable - required
+- `discount`: Discount amount - required
+- `saleType`: Type of sale - **required** (e.g., "Goods at standard rate (default)")
+- `sroItemSerialNo`: SRO item serial number (optional)
+
+**Common Sale Types**:
+- "Goods at standard rate (default)"
+- "Goods at standard rate to registered buyers"
+- "Goods at standard rate to unregistered buyers"
+- "Goods at Reduced Rate"
+- "Exempt Goods"
+- "Goods at zero-rate"
+- "Services"
+- And other FBR-approved sale type descriptions
+
+**cURL Request**:
+```bash
+curl -X POST http://localhost:5000/api/v1/invoices/production \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invoiceType": "Sale Invoice",
+    "invoiceDate": "2026-01-17",
+    "buyerId": "990e8400-e29b-41d4-a716-446655440001",
+    "invoiceRefNo": "INV-2026-001",
+    "items": [
+      {
+        "hsCodeId": "bb0e8400-e29b-41d4-a716-446655440001",
+        "productDescription": "Sample Product",
+        "rate": "18%",
+        "uoM": "Numbers, pieces, units",
+        "quantity": 1,
+        "totalValues": 0,
+        "valueSalesExcludingST": 1000,
+        "fixedNotifiedValueOrRetailPrice": 0,
+        "salesTaxApplicable": 180,
+        "salesTaxWithheldAtSource": 0,
+        "extraTax": 0,
+        "furtherTax": 120,
+        "sroScheduleNo": "SRO123",
+        "fedPayable": 0,
+        "discount": 0,
+        "saleType": "Goods at standard rate (default)",
+        "sroItemSerialNo": ""
+      }
+    ]
+  }'
+```
+
+**Success Response (201 Created)**:
+```json
+{
+  "status": "success",
+  "data": {
+    "invoice": {
+      "id": "770e8400-e29b-41d4-a716-446655440001",
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "buyerId": "990e8400-e29b-41d4-a716-446655440001",
+      "scenarioId": null,
+      "invoiceType": "Sale Invoice",
+      "invoiceDate": "2026-01-17T00:00:00.000Z",
+      "invoiceRefNo": "INV-2026-001",
+      "fbrInvoiceNumber": "FBR123456789",
+      "fbrResponse": {
+        "invoiceNumber": "FBR123456789",
+        "status": "success",
+        "message": "Invoice posted successfully"
+      },
+      "isTestEnvironment": false,
+      "createdAt": "2026-01-17T10:00:00.000Z",
+      "updatedAt": "2026-01-17T10:00:00.000Z",
+      "items": [
+        {
+          "id": "880e8400-e29b-41d4-a716-446655440001",
+          "invoiceId": "770e8400-e29b-41d4-a716-446655440001",
+          "hsCodeId": "bb0e8400-e29b-41d4-a716-446655440001",
+          "productDescription": "Sample Product",
+          "rate": "18%",
+          "uoM": "Numbers, pieces, units",
+          "quantity": "1",
+          "totalValues": "0.00",
+          "valueSalesExcludingST": "1000.00",
+          "fixedNotifiedValueOrRetailPrice": "0.00",
+          "salesTaxApplicable": "180.00",
+          "salesTaxWithheldAtSource": "0.00",
+          "extraTax": "0.00",
+          "furtherTax": "120.00",
+          "sroScheduleNo": "SRO123",
+          "fedPayable": "0.00",
+          "discount": "0.00",
+          "saleType": "Goods at standard rate (default)",
+          "sroItemSerialNo": "",
+          "createdAt": "2026-01-17T10:00:00.000Z",
+          "updatedAt": "2026-01-17T10:00:00.000Z",
+          "hsCode": {
+            "id": "bb0e8400-e29b-41d4-a716-446655440001",
+            "hsCode": "0101.2100",
+            "description": "Sample product category"
+          }
+        }
+      ],
+      "buyer": {
+        "id": "990e8400-e29b-41d4-a716-446655440001",
+        "ntncnic": "9876543210987",
+        "businessName": "XYZ Corporation",
+        "province": "Sindh",
+        "address": "456 Business Avenue, Karachi",
+        "registrationType": "Unregistered"
+      }
+    },
+    "fbrResponse": {
+      "invoiceNumber": "FBR123456789",
+      "status": "success",
+      "message": "Invoice posted successfully"
+    }
+  }
+}
+```
+
+**Error Responses**:
+
+**400 Bad Request** - Validation Error:
+```json
+{
+  "status": "fail",
+  "error": {
+    "statusCode": 400
+  },
+  "message": "[{\"field\":\"buyerId\",\"message\":\"Buyer ID must be a valid UUID\"}]"
+}
+```
+
+**400 Bad Request** - Missing Production Token:
+```json
+{
+  "status": "fail",
+  "error": {
+    "statusCode": 400
+  },
+  "message": "Production FBR token not configured for this user. Please contact admin."
+}
+```
+
+**404 Not Found** - Buyer Not Found:
+```json
+{
+  "status": "fail",
+  "error": {
+    "statusCode": 404
+  },
+  "message": "Buyer not found"
+}
+```
+
+**404 Not Found** - HS Code Not Found:
+```json
+{
+  "status": "fail",
+  "error": {
+    "statusCode": 404
+  },
+  "message": "One or more HS codes not found"
+}
+```
+
+**401 Unauthorized** - Not Authenticated:
+```json
+{
+  "status": "fail",
+  "error": {
+    "statusCode": 401
+  },
+  "message": "Authentication token is required"
+}
+```
+
+**500 Internal Server Error** - FBR API Error:
+```json
+{
+  "status": "error",
+  "error": {
+    "statusCode": 500
+  },
+  "message": "FBR API Error: Failed to post invoice"
+}
+```
+
+**500 Internal Server Error** - FBR Connection Error:
+```json
+{
+  "status": "error",
+  "error": {
+    "statusCode": 500
+  },
+  "message": "Failed to connect to FBR API: Connection timeout"
 }
 ```
 

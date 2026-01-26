@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   postInvoice,
+  postProductionInvoice,
   validateInvoice,
   getUserInvoices,
   getInvoiceById,
@@ -8,6 +9,7 @@ import {
 } from '../controllers/invoiceController.js';
 import {
   postInvoiceValidation,
+  postProductionInvoiceValidation,
   validateInvoiceValidation,
 } from '../validators/invoiceValidators.js';
 import { validate } from '../middleware/validator.js';
@@ -20,6 +22,7 @@ router.use(authenticate);
 
 // Invoice routes
 router.post('/', postInvoiceValidation, validate, postInvoice);
+router.post('/production', postProductionInvoiceValidation, validate, postProductionInvoice);
 router.post('/validate', validateInvoiceValidation, validate, validateInvoice);
 router.get('/', getUserInvoices);
 router.get('/:id', getInvoiceById);

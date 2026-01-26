@@ -455,3 +455,209 @@ export const deleteInvoice = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Post Invoice to FBR Production
+ * @route POST /api/v1/invoices/production
+ */
+export const postProductionInvoice = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const {
+      invoiceType,
+      invoiceDate,
+      buyerId,
+      invoiceRefNo,
+      items,
+    } = req.body;
+
+    // Get user (seller) information
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        postInvoiceToken: true,
+        ntncnic: true,
+        businessName: true,
+        province: true,
+        address: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (!user.postInvoiceToken) {
+      throw new AppError(
+        'Production FBR token not configured for this user. Please contact admin.',
+        400
+      );
+    }
+
+    // Get buyer information
+    const buyer = await prisma.buyer.findFirst({
+      where: {
+        id: buyerId,
+        userId, // Ensure buyer belongs to current user
+      },
+    });
+
+    if (!buyer) {
+      throw new AppError('Buyer not found', 404);
+    }
+
+    // Validate HS codes exist and belong to user
+    const hsCodeIds = items.map((item) => item.hsCodeId);
+    const hsCodes = await prisma.hsCode.findMany({
+      where: {
+        id: { in: hsCodeIds },
+        userId,
+      },
+    });
+
+    if (hsCodes.length !== hsCodeIds.length) {
+      throw new AppError('One or more HS codes not found', 404);
+    }
+
+    // Create a map of HS codes for quick lookup
+    const hsCodeMap = {};
+    hsCodes.forEach((hs) => {
+      hsCodeMap[hs.id] = hs.hsCode;
+    });
+
+    // Prepare FBR invoice items
+    const fbrItems = items.map((item) => ({
+      hsCode: hsCodeMap[item.hsCodeId],
+      productDescription: item.productDescription,
+      rate: item.rate,
+      uoM: item.uoM,
+      quantity: parseFloat(item.quantity),
+      totalValues: parseFloat(item.totalValues),
+      valueSalesExcludingST: parseFloat(item.valueSalesExcludingST),
+      fixedNotifiedValueOrRetailPrice: parseFloat(item.fixedNotifiedValueOrRetailPrice),
+      salesTaxApplicable: parseFloat(item.salesTaxApplicable),
+      salesTaxWithheldAtSource: parseFloat(item.salesTaxWithheldAtSource),
+      extraTax: parseFloat(item.extraTax || 0),
+      furtherTax: parseFloat(item.furtherTax),
+      sroScheduleNo: item.sroScheduleNo || '',
+      fedPayable: parseFloat(item.fedPayable),
+      discount: parseFloat(item.discount),
+      saleType: item.saleType,
+      sroItemSerialNo: item.sroItemSerialNo || '',
+    }));
+
+    // Prepare FBR API request payload
+    const fbrPayload = {
+      invoiceType,
+      invoiceDate,
+      sellerNTNCNIC: user.ntncnic,
+      sellerBusinessName: user.businessName,
+      sellerProvince: user.province,
+      sellerAddress: user.address,
+      buyerNTNCNIC: buyer.ntncnic,
+      buyerBusinessName: buyer.businessName,
+      buyerProvince: buyer.province,
+      buyerAddress: buyer.address,
+      buyerRegistrationType: buyer.registrationType,
+      invoiceRefNo: invoiceRefNo || '',
+      items: fbrItems,
+    };
+
+    // Call FBR Production API
+    let fbrResponse;
+    try {
+      const response = await fetch('https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.postInvoiceToken}`,
+        },
+        body: JSON.stringify(fbrPayload),
+      });
+
+      fbrResponse = await response.json();
+
+      if (!response.ok) {
+        throw new AppError(
+          `FBR API Error: ${fbrResponse.message || 'Failed to post invoice'}`,
+          response.status
+        );
+      }
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError(`Failed to connect to FBR API: ${error.message}`, 500);
+    }
+
+    // Save invoice to database
+    const invoice = await prisma.invoice.create({
+      data: {
+        userId,
+        buyerId,
+        invoiceType,
+        invoiceDate: new Date(invoiceDate),
+        sellerNTNCNIC: user.ntncnic,
+        sellerBusinessName: user.businessName,
+        sellerProvince: user.province,
+        sellerAddress: user.address,
+        buyerNTNCNIC: buyer.ntncnic,
+        buyerBusinessName: buyer.businessName,
+        buyerProvince: buyer.province,
+        buyerAddress: buyer.address,
+        buyerRegistrationType: buyer.registrationType,
+        invoiceRefNo: invoiceRefNo || null,
+        scenarioId: null,
+        fbrInvoiceNumber: fbrResponse.invoiceNumber || null,
+        fbrResponse: fbrResponse,
+        isTestEnvironment: false,
+        items: {
+          create: items.map((item) => ({
+            hsCodeId: item.hsCodeId,
+            hsCode: hsCodeMap[item.hsCodeId],
+            productDescription: item.productDescription,
+            rate: item.rate,
+            uoM: item.uoM,
+            quantity: item.quantity.toString(),
+            totalValues: item.totalValues.toString(),
+            valueSalesExcludingST: item.valueSalesExcludingST.toString(),
+            fixedNotifiedValueOrRetailPrice: item.fixedNotifiedValueOrRetailPrice.toString(),
+            salesTaxApplicable: item.salesTaxApplicable.toString(),
+            salesTaxWithheldAtSource: item.salesTaxWithheldAtSource.toString(),
+            extraTax: (item.extraTax || 0).toString(),
+            furtherTax: item.furtherTax.toString(),
+            sroScheduleNo: item.sroScheduleNo || '',
+            fedPayable: item.fedPayable.toString(),
+            discount: item.discount.toString(),
+            saleType: item.saleType,
+            sroItemSerialNo: item.sroItemSerialNo || '',
+          })),
+        },
+      },
+      include: {
+        items: {
+          include: {
+            hsCode: {
+              select: {
+                id: true,
+                hsCode: true,
+                description: true,
+              },
+            },
+          },
+        },
+        buyer: true,
+      },
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        invoice,
+        fbrResponse,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
