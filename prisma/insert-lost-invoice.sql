@@ -5,12 +5,32 @@
 DO $$
 DECLARE
   v_invoice_id UUID;
+  v_error_message TEXT;
 BEGIN
+  -- Check user exists
+  IF NOT EXISTS (SELECT 1 FROM users WHERE id = '0b4c0575-ad97-4ac3-bb39-af7d2c66959c') THEN
+    RAISE EXCEPTION 'User with ID 0b4c0575-ad97-4ac3-bb39-af7d2c66959c does not exist';
+  END IF;
+  
+  -- Check buyer exists
+  IF NOT EXISTS (SELECT 1 FROM buyers WHERE id = '80d0b517-befe-4af1-8daa-f0431554dbec') THEN
+    RAISE EXCEPTION 'Buyer with ID 80d0b517-befe-4af1-8daa-f0431554dbec does not exist';
+  END IF;
+  
+  -- Check hs_code exists
+  IF NOT EXISTS (SELECT 1 FROM hs_codes WHERE id = 'edd7e7f6-a4fd-4e19-b42a-ea5f68486264') THEN
+    RAISE EXCEPTION 'HS Code with ID edd7e7f6-a4fd-4e19-b42a-ea5f68486264 does not exist';
+  END IF;
+  
   -- Check if invoice already exists
   SELECT id INTO v_invoice_id FROM invoices WHERE fbr_invoice_number = '3520223926179DIABBBOM380503';
   
-  IF v_invoice_id IS NULL THEN
-    -- Insert the invoice if it doesn't exist
+  IF v_invoice_id IS NOT NULL THEN
+    RAISE NOTICE 'Invoice already exists with ID: %', v_invoice_id;
+  ELSE
+    RAISE NOTICE 'All foreign keys exist. Attempting insert...';
+    
+    -- Try to insert the invoice
     INSERT INTO invoices (
       id,
       user_id,
@@ -38,6 +58,8 @@ BEGIN
       NOW(),
       NOW()
     ) RETURNING id INTO v_invoice_id;
+    
+    RAISE NOTICE 'Invoice inserted with ID: %', v_invoice_id;
     
     -- Insert the invoice item
     INSERT INTO invoice_items (
@@ -88,8 +110,11 @@ BEGIN
       NOW()
     );
     
-    RAISE NOTICE 'Invoice inserted successfully with ID: %', v_invoice_id;
-  ELSE
-    RAISE NOTICE 'Invoice already exists with ID: %', v_invoice_id;
+    RAISE NOTICE 'Invoice item inserted successfully';
   END IF;
+  
+EXCEPTION
+  WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_message = MESSAGE_TEXT;
+    RAISE EXCEPTION 'Error occurred: %', v_error_message;
 END $$;
