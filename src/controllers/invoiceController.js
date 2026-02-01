@@ -169,14 +169,42 @@ export const postInvoice = async (req, res, next) => {
       body: JSON.stringify(fbrPayload),
     });
 
-    const fbrResponseData = await fbrResponse.json();
+    // Check response content type to handle XML errors from FBR
+    const contentType = fbrResponse.headers.get('content-type');
+    let fbrResponseData;
 
-    // Check if FBR API call was successful
     if (!fbrResponse.ok) {
+      // Try to parse error response
+      let errorMessage = 'Failed to post invoice';
+      
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await fbrResponse.json();
+        errorMessage = errorData.message || errorMessage;
+      } else if (contentType && contentType.includes('xml')) {
+        const xmlText = await fbrResponse.text();
+        // Extract error message from XML if possible
+        const faultMatch = xmlText.match(/<faultstring>(.*?)<\/faultstring>/);
+        if (faultMatch) {
+          errorMessage = faultMatch[1];
+        } else {
+          errorMessage = 'FBR API returned an error in XML format';
+        }
+      } else {
+        const responseText = await fbrResponse.text();
+        errorMessage = responseText || errorMessage;
+      }
+      
       throw new AppError(
-        `FBR API Error: ${fbrResponseData.message || 'Failed to post invoice'}`,
+        `FBR API Error: ${errorMessage}`,
         fbrResponse.status
       );
+    }
+
+    // Parse successful JSON response
+    if (contentType && contentType.includes('application/json')) {
+      fbrResponseData = await fbrResponse.json();
+    } else {
+      throw new AppError('FBR API returned unexpected content type', 500);
     }
 
     const fbrInvoiceNumber = fbrResponseData.invoiceNumber || fbrResponseData.InvoiceNumber || null;
@@ -305,14 +333,42 @@ export const validateInvoice = async (req, res, next) => {
       body: JSON.stringify({ invoiceNumber }),
     });
 
-    const fbrResponseData = await fbrResponse.json();
+    // Check response content type to handle XML errors from FBR
+    const contentType = fbrResponse.headers.get('content-type');
+    let fbrResponseData;
 
-    // Check if FBR API call was successful
     if (!fbrResponse.ok) {
+      // Try to parse error response
+      let errorMessage = 'Failed to validate invoice';
+      
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await fbrResponse.json();
+        errorMessage = errorData.message || errorMessage;
+      } else if (contentType && contentType.includes('xml')) {
+        const xmlText = await fbrResponse.text();
+        // Extract error message from XML if possible
+        const faultMatch = xmlText.match(/<faultstring>(.*?)<\/faultstring>/);
+        if (faultMatch) {
+          errorMessage = faultMatch[1];
+        } else {
+          errorMessage = 'FBR API returned an error in XML format';
+        }
+      } else {
+        const responseText = await fbrResponse.text();
+        errorMessage = responseText || errorMessage;
+      }
+      
       throw new AppError(
-        `FBR API Error: ${fbrResponseData.message || 'Failed to validate invoice'}`,
+        `FBR API Error: ${errorMessage}`,
         fbrResponse.status
       );
+    }
+
+    // Parse successful JSON response
+    if (contentType && contentType.includes('application/json')) {
+      fbrResponseData = await fbrResponse.json();
+    } else {
+      throw new AppError('FBR API returned unexpected content type', 500);
     }
 
     res.status(200).json({
@@ -627,14 +683,43 @@ export const postProductionInvoice = async (req, res, next) => {
         body: JSON.stringify(fbrPayload),
       });
 
-      fbrResponse = await response.json();
-
+      // Check response content type to handle XML errors from FBR
+      const contentType = response.headers.get('content-type');
+      
       if (!response.ok) {
+        // Try to parse error response
+        let errorMessage = 'Failed to post invoice';
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } else if (contentType && contentType.includes('xml')) {
+          const xmlText = await response.text();
+          // Extract error message from XML if possible
+          const faultMatch = xmlText.match(/<faultstring>(.*?)<\/faultstring>/);
+          if (faultMatch) {
+            errorMessage = faultMatch[1];
+          } else {
+            errorMessage = 'FBR API returned an error in XML format';
+          }
+        } else {
+          const responseText = await response.text();
+          errorMessage = responseText || errorMessage;
+        }
+        
         throw new AppError(
-          `FBR API Error: ${fbrResponse.message || 'Failed to post invoice'}`,
+          `FBR API Error: ${errorMessage}`,
           response.status
         );
       }
+
+      // Parse successful JSON response
+      if (contentType && contentType.includes('application/json')) {
+        fbrResponse = await response.json();
+      } else {
+        throw new AppError('FBR API returned unexpected content type', 500);
+      }
+      
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
