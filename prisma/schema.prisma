@@ -38,6 +38,8 @@ model User {
   invoices                    Invoice[]
   buyers                      Buyer[]
   hsCodes                     HsCode[]
+  customFields                CustomField[]
+  invoicePrintSettings        InvoicePrintSettings?
 
   @@map("users")
 }
@@ -184,8 +186,67 @@ model InvoiceItem {
   // Relations
   invoice                       Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   hsCode                        HsCode          @relation(fields: [hsCodeId], references: [id], onDelete: Restrict)
+  customFieldValues             InvoiceItemCustomFieldValue[]
 
   @@map("invoice_items")
+}
+
+model CustomField {
+  id                      String                     @id @default(uuid())
+  userId                  String                     @map("user_id")
+  fieldName               String                     @map("field_name")
+  fieldType               String                     @map("field_type") // 'text', 'number', 'date', etc.
+  isActive                Boolean                    @default(true) @map("is_active")
+  createdAt               DateTime                   @default(now()) @map("created_at")
+  updatedAt               DateTime                   @updatedAt @map("updated_at")
+  
+  // Relations
+  user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceItemCustomFieldValues InvoiceItemCustomFieldValue[]
+
+  @@unique([userId, fieldName])
+  @@map("custom_fields")
+}
+
+model InvoiceItemCustomFieldValue {
+  id                      String       @id @default(uuid())
+  invoiceItemId           String       @map("invoice_item_id")
+  customFieldId           String       @map("custom_field_id")
+  value                   String       // Store all values as string, convert based on fieldType
+  createdAt               DateTime     @default(now()) @map("created_at")
+  updatedAt               DateTime     @updatedAt @map("updated_at")
+  
+  // Relations
+  invoiceItem             InvoiceItem  @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  customField             CustomField  @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceItemId, customFieldId])
+  @@map("invoice_item_custom_field_values")
+}
+
+model InvoicePrintSettings {
+  id                      String       @id @default(uuid())
+  userId                  String       @unique @map("user_id")
+  
+  // Field visibility settings (JSON array - includes both regular fields AND custom field IDs with customField_ prefix)
+  visibleFields           Json         @map("visible_fields")
+  
+  // Column width settings (JSON object - includes widths for both regular and custom fields)
+  columnWidths            Json         @map("column_widths")
+  
+  // General settings
+  fontSize                String       @default("small") @map("font_size") // "small", "medium", "large"
+  tableBorders            Boolean      @default(true) @map("table_borders")
+  showItemNumbers         Boolean      @default(true) @map("show_item_numbers")
+  
+  createdAt               DateTime     @default(now()) @map("created_at")
+  updatedAt               DateTime     @updatedAt @map("updated_at")
+  
+  // Relations
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("invoice_print_settings")
 }
 
 enum Role {

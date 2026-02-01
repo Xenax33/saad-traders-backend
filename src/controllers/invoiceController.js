@@ -82,21 +82,42 @@ export const postInvoice = async (req, res, next) => {
 
     const scenario = userScenario.scenario;
 
-    // Get HS codes for all items
-    const hsCodeIds = items.map((item) => item.hsCodeId);
+    // Get HS codes for all items (check against unique HS code IDs)
+    const uniqueHsCodeIds = [...new Set(items.map((item) => item.hsCodeId))];
     const hsCodes = await prisma.hsCode.findMany({
       where: {
-        id: { in: hsCodeIds },
-        userId, // Ensure HS codes belong to current user
+        id: { in: uniqueHsCodeIds },
+        userId,
       },
     });
 
-    if (hsCodes.length !== hsCodeIds.length) {
+    if (hsCodes.length !== uniqueHsCodeIds.length) {
       throw new AppError('One or more HS codes not found', 404);
     }
-
-    // Create a map of hsCodeId to hsCode for easy lookup
     const hsCodeMap = new Map(hsCodes.map((hc) => [hc.id, hc.hsCode]));
+
+    // Validate custom fields for each item if provided
+    const allCustomFieldIds = [];
+    items.forEach((item) => {
+      if (item.customFields && item.customFields.length > 0) {
+        item.customFields.forEach((cf) => allCustomFieldIds.push(cf.customFieldId));
+      }
+    });
+
+    if (allCustomFieldIds.length > 0) {
+      const uniqueCustomFieldIds = [...new Set(allCustomFieldIds)];
+      const userCustomFields = await prisma.customField.findMany({
+        where: {
+          id: { in: uniqueCustomFieldIds },
+          userId,
+          isActive: true,
+        },
+      });
+
+      if (userCustomFields.length !== uniqueCustomFieldIds.length) {
+        throw new AppError('One or more custom fields not found or inactive', 404);
+      }
+    }
 
     // Prepare FBR API payload
     const fbrPayload = {
@@ -158,58 +179,77 @@ export const postInvoice = async (req, res, next) => {
       );
     }
 
-    // Extract invoice number from FBR response (adjust based on actual FBR response structure)
     const fbrInvoiceNumber = fbrResponseData.invoiceNumber || fbrResponseData.InvoiceNumber || null;
 
-    // Save invoice to database
-    const invoice = await prisma.invoice.create({
-      data: {
-        userId,
-        buyerId,
-        scenarioId,
-        invoiceType,
-        invoiceDate: new Date(invoiceDate),
-        invoiceRefNo,
-        fbrInvoiceNumber,
-        fbrResponse: fbrResponseData,
-        isTestEnvironment,
-        items: {
-          create: items.map((item) => ({
-            hsCodeId: item.hsCodeId,
-            productDescription: item.productDescription,
-            rate: item.rate,
-            uoM: item.uoM,
-            quantity: item.quantity,
-            totalValues: item.totalValues,
-            valueSalesExcludingST: item.valueSalesExcludingST,
-            fixedNotifiedValueOrRetailPrice: item.fixedNotifiedValueOrRetailPrice,
-            salesTaxApplicable: item.salesTaxApplicable,
-            salesTaxWithheldAtSource: item.salesTaxWithheldAtSource,
-            extraTax: item.extraTax,
-            furtherTax: item.furtherTax,
-            sroScheduleNo: item.sroScheduleNo,
-            fedPayable: item.fedPayable,
-            discount: item.discount,
-            sroItemSerialNo: item.sroItemSerialNo,
-          })),
-        },
-      },
-      include: {
-        items: {
-          include: {
-            hsCode: true,
+    const isValidResponse = fbrResponseData.validationResponse?.statusCode === '00';
+
+    let invoice = null;
+
+    if (isValidResponse) {
+      invoice = await prisma.invoice.create({
+        data: {
+          userId,
+          buyerId,
+          scenarioId,
+          invoiceType,
+          invoiceDate: new Date(invoiceDate),
+          invoiceRefNo,
+          fbrInvoiceNumber,
+          fbrResponse: fbrResponseData,
+          isTestEnvironment,
+          items: {
+            create: items.map((item) => ({
+              hsCodeId: item.hsCodeId,
+              productDescription: item.productDescription,
+              rate: item.rate,
+              uoM: item.uoM,
+              quantity: item.quantity,
+              totalValues: item.totalValues,
+              valueSalesExcludingST: item.valueSalesExcludingST,
+              fixedNotifiedValueOrRetailPrice: item.fixedNotifiedValueOrRetailPrice,
+              salesTaxApplicable: item.salesTaxApplicable,
+              salesTaxWithheldAtSource: item.salesTaxWithheldAtSource,
+              extraTax: item.extraTax,
+              furtherTax: item.furtherTax,
+              sroScheduleNo: item.sroScheduleNo,
+              fedPayable: item.fedPayable,
+              discount: item.discount,
+              sroItemSerialNo: item.sroItemSerialNo,
+              customFieldValues: {
+                create: (item.customFields || []).map((cf) => ({
+                  customFieldId: cf.customFieldId,
+                  value: cf.value.toString(), // Store as string
+                })),
+              },
+            })),
           },
         },
-        buyer: true,
-        scenario: true,
-      },
-    });
+        include: {
+          items: {
+            include: {
+              hsCode: true,
+              customFieldValues: {
+                include: {
+                  customField: true,
+                },
+              },
+            },
+          },
+          buyer: true,
+          scenario: true,
+        },
+      });
+    }
 
-    res.status(201).json({
-      status: 'success',
+    res.status(isValidResponse ? 201 : 200).json({
+      status: isValidResponse ? 'success' : 'validation_failed',
+      message: isValidResponse 
+        ? 'Invoice posted and saved successfully' 
+        : 'Invoice posted to FBR but validation failed. Invoice not saved.',
       data: {
         invoice,
         fbrResponse: fbrResponseData,
+        savedToDatabase: isValidResponse,
       },
     });
   } catch (error) {
@@ -328,6 +368,11 @@ export const getUserInvoices = async (req, res, next) => {
           items: {
             include: {
               hsCode: true,
+              customFieldValues: {
+                include: {
+                  customField: true,
+                },
+              },
             },
           },
           buyer: true,
@@ -388,6 +433,11 @@ export const getInvoiceById = async (req, res, next) => {
         items: {
           include: {
             hsCode: true,
+            customFieldValues: {
+              include: {
+                customField: true,
+              },
+            },
           },
         },
         buyer: true,
@@ -567,12 +617,6 @@ export const postProductionInvoice = async (req, res, next) => {
     // Call FBR Production API
     let fbrResponse;
     try {
-      console.log('========================================');
-      console.log('📤 SENDING TO FBR PRODUCTION API');
-      console.log('Endpoint: https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata');
-      console.log('User:', user.businessName, '(', user.ntncnic, ')');
-      console.log('Payload:', JSON.stringify(fbrPayload, null, 2));
-      console.log('========================================');
 
       const response = await fetch('https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata', {
         method: 'POST',
@@ -585,12 +629,6 @@ export const postProductionInvoice = async (req, res, next) => {
 
       fbrResponse = await response.json();
 
-      console.log('========================================');
-      console.log('📥 RECEIVED FROM FBR PRODUCTION API');
-      console.log('Status Code:', response.status);
-      console.log('Response:', JSON.stringify(fbrResponse, null, 2));
-      console.log('========================================');
-
       if (!response.ok) {
         throw new AppError(
           `FBR API Error: ${fbrResponse.message || 'Failed to post invoice'}`,
@@ -598,72 +636,76 @@ export const postProductionInvoice = async (req, res, next) => {
         );
       }
     } catch (error) {
-      console.log('========================================');
-      console.log('❌ FBR PRODUCTION API ERROR');
-      console.log('Error:', error.message);
-      console.log('========================================');
-      
       if (error instanceof AppError) {
         throw error;
       }
       throw new AppError(`Failed to connect to FBR API: ${error.message}`, 500);
     }
 
-    // Save invoice to database
-    const invoice = await prisma.invoice.create({
-      data: {
-        userId,
-        buyerId,
-        invoiceType,
-        invoiceDate: new Date(invoiceDate),
-        invoiceRefNo: invoiceRefNo || null,
-        scenarioId: null,
-        fbrInvoiceNumber: fbrResponse.invoiceNumber || null,
-        fbrResponse: fbrResponse,
-        isTestEnvironment: false,
-        items: {
-          create: items.map((item) => ({
-            hsCodeId: item.hsCodeId,
-            productDescription: item.productDescription,
-            rate: item.rate,
-            uoM: item.uoM,
-            quantity: item.quantity.toString(),
-            totalValues: item.totalValues.toString(),
-            valueSalesExcludingST: item.valueSalesExcludingST.toString(),
-            fixedNotifiedValueOrRetailPrice: item.fixedNotifiedValueOrRetailPrice.toString(),
-            salesTaxApplicable: item.salesTaxApplicable.toString(),
-            salesTaxWithheldAtSource: item.salesTaxWithheldAtSource.toString(),
-            extraTax: (item.extraTax || 0).toString(),
-            furtherTax: item.furtherTax.toString(),
-            sroScheduleNo: item.sroScheduleNo || '',
-            fedPayable: item.fedPayable.toString(),
-            discount: item.discount.toString(),
-            saleType: item.saleType,
-            sroItemSerialNo: item.sroItemSerialNo || '',
-          })),
+    const isValidResponse = fbrResponse.validationResponse?.statusCode === '00';
+
+    let invoice = null;
+
+    if (isValidResponse) {
+      invoice = await prisma.invoice.create({
+        data: {
+          userId,
+          buyerId,
+          invoiceType,
+          invoiceDate: new Date(invoiceDate),
+          invoiceRefNo: invoiceRefNo || null,
+          scenarioId: null,
+          fbrInvoiceNumber: fbrResponse.invoiceNumber || null,
+          fbrResponse: fbrResponse,
+          isTestEnvironment: false,
+          items: {
+            create: items.map((item) => ({
+              hsCodeId: item.hsCodeId,
+              productDescription: item.productDescription,
+              rate: item.rate,
+              uoM: item.uoM,
+              quantity: item.quantity.toString(),
+              totalValues: item.totalValues.toString(),
+              valueSalesExcludingST: item.valueSalesExcludingST.toString(),
+              fixedNotifiedValueOrRetailPrice: item.fixedNotifiedValueOrRetailPrice.toString(),
+              salesTaxApplicable: item.salesTaxApplicable.toString(),
+              salesTaxWithheldAtSource: item.salesTaxWithheldAtSource.toString(),
+              extraTax: (item.extraTax || 0).toString(),
+              furtherTax: item.furtherTax.toString(),
+              sroScheduleNo: item.sroScheduleNo || '',
+              fedPayable: item.fedPayable.toString(),
+              discount: item.discount.toString(),
+              saleType: item.saleType,
+              sroItemSerialNo: item.sroItemSerialNo || '',
+            })),
+          },
         },
-      },
-      include: {
-        items: {
-          include: {
-            hsCode: {
-              select: {
-                id: true,
-                hsCode: true,
-                description: true,
+        include: {
+          items: {
+            include: {
+              hsCode: {
+                select: {
+                  id: true,
+                  hsCode: true,
+                  description: true,
+                },
               },
             },
           },
+          buyer: true,
         },
-        buyer: true,
-      },
-    });
+      });
+    }
 
-    res.status(201).json({
-      status: 'success',
+    res.status(isValidResponse ? 201 : 200).json({
+      status: isValidResponse ? 'success' : 'validation_failed',
+      message: isValidResponse 
+        ? 'Invoice posted and saved successfully' 
+        : 'Invoice posted to FBR but validation failed. Invoice not saved.',
       data: {
         invoice,
         fbrResponse,
+        savedToDatabase: isValidResponse,
       },
     });
   } catch (error) {

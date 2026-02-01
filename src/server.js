@@ -11,6 +11,8 @@ import scenarioRoutes from './routes/scenarioRoutes.js';
 import hsCodeRoutes from './routes/hsCodeRoutes.js';
 import buyerRoutes from './routes/buyerRoutes.js';
 import invoiceRoutes from './routes/invoiceRoutes.js';
+import customFieldRoutes from './routes/customFieldRoutes.js';
+import printSettingsRoutes from './routes/printSettingsRoutes.js';
 
 const app = express();
 
@@ -85,6 +87,8 @@ app.use('/api/v1/scenarios', scenarioRoutes);
 app.use('/api/v1/hs-codes', hsCodeRoutes);
 app.use('/api/v1/buyers', buyerRoutes);
 app.use('/api/v1/invoices', invoiceRoutes);
+app.use('/api/v1/custom-fields', customFieldRoutes);
+app.use('/api/v1/invoice-print-settings', printSettingsRoutes);
 
 // 404 handler
 app.all('*', (req, res) => {
