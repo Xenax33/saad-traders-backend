@@ -266,6 +266,25 @@ export const postProductionInvoiceValidation = [
   body('items.*.sroItemSerialNo')
     .optional()
     .trim(),
+
+  // Custom fields validation for each item (optional)
+  body('items.*.customFields')
+    .optional()
+    .isArray()
+    .withMessage('Custom fields must be an array'),
+
+  body('items.*.customFields.*.customFieldId')
+    .if(body('items.*.customFields').exists())
+    .trim()
+    .notEmpty()
+    .withMessage('Custom field ID is required')
+    .isUUID()
+    .withMessage('Custom field ID must be a valid UUID'),
+
+  body('items.*.customFields.*.value')
+    .if(body('items.*.customFields').exists())
+    .notEmpty()
+    .withMessage('Custom field value is required'),
 ];
 
 export const validateInvoiceValidation = [
