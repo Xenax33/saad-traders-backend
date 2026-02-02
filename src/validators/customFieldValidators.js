@@ -9,8 +9,8 @@ export const createCustomFieldValidation = [
     .withMessage('Field name must be a string')
     .isLength({ min: 1, max: 50 })
     .withMessage('Field name must be between 1 and 50 characters')
-    .matches(/^[a-zA-Z0-9_\s]+$/)
-    .withMessage('Field name can only contain letters, numbers, underscores, and spaces'),
+    .matches(/^[\x20-\x7E]+$/)
+    .withMessage('Field name can only contain printable characters (letters, numbers, spaces, and symbols like / # - . , etc.)'),
 
   body('fieldType')
     .trim()
@@ -35,8 +35,8 @@ export const updateCustomFieldValidation = [
     .withMessage('Field name must be a string')
     .isLength({ min: 1, max: 50 })
     .withMessage('Field name must be between 1 and 50 characters')
-    .matches(/^[a-zA-Z0-9_\s]+$/)
-    .withMessage('Field name can only contain letters, numbers, underscores, and spaces'),
+    .matches(/^[\x20-\x7E]+$/)
+    .withMessage('Field name can only contain printable characters (letters, numbers, spaces, and symbols like / # - . , etc.)'),
 
   body('fieldType')
     .optional()
