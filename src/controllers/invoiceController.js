@@ -632,6 +632,29 @@ export const postProductionInvoice = async (req, res, next) => {
       hsCodeMap[hs.id] = hs.hsCode;
     });
 
+    // Validate custom fields for each item if provided
+    const allCustomFieldIds = [];
+    items.forEach((item) => {
+      if (item.customFields && item.customFields.length > 0) {
+        item.customFields.forEach((cf) => allCustomFieldIds.push(cf.customFieldId));
+      }
+    });
+
+    if (allCustomFieldIds.length > 0) {
+      const uniqueCustomFieldIds = [...new Set(allCustomFieldIds)];
+      const userCustomFields = await prisma.customField.findMany({
+        where: {
+          id: { in: uniqueCustomFieldIds },
+          userId,
+          isActive: true,
+        },
+      });
+
+      if (userCustomFields.length !== uniqueCustomFieldIds.length) {
+        throw new AppError('One or more custom fields not found or inactive', 404);
+      }
+    }
+
     // Prepare FBR invoice items
     const fbrItems = items.map((item) => ({
       hsCode: hsCodeMap[item.hsCodeId],
@@ -762,6 +785,12 @@ export const postProductionInvoice = async (req, res, next) => {
               discount: item.discount.toString(),
               saleType: item.saleType,
               sroItemSerialNo: item.sroItemSerialNo || '',
+              customFieldValues: {
+                create: (item.customFields || []).map((cf) => ({
+                  customFieldId: cf.customFieldId,
+                  value: cf.value.toString(),
+                })),
+              },
             })),
           },
         },
@@ -773,6 +802,11 @@ export const postProductionInvoice = async (req, res, next) => {
                   id: true,
                   hsCode: true,
                   description: true,
+                },
+              },
+              customFieldValues: {
+                include: {
+                  customField: true,
                 },
               },
             },
